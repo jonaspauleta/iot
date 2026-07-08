@@ -1,0 +1,15 @@
+{
+  "name": "m5-claude-usage",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node push.js",
+    "stdout": "node push.js --stdout",
+    "replay": "node push.js --replay",
+    "test": "node usage-parser.test.js && node push.test.js"
+  },
+  "dependencies": {
+    "serialport": "^12"
+  }
+}
