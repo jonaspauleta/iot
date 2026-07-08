@@ -14,6 +14,7 @@ static const uint32_t STALE_MS = 900000; // 15 min; > default 5 min poll
 static const uint32_t SAVER_MS = 30000; // idle time before the crab takes over
 
 uint16_t C_BG, C_TRACK, C_GREEN, C_AMBER, C_RED, C_TEXT, C_DIM, C_ACCENT;
+uint16_t C_CRAB, C_CRAB_DK;
 
 M5Canvas canvas(&M5.Display);
 bool useSprite = false;
@@ -163,10 +164,60 @@ void drawUI(G& g) {
   g.drawString("< prev      refresh      next >", W / 2, H - 2);
 }
 
-// Screensaver: animated Clawd. Body filled in by Task 2; stub blanks the screen.
+// Screensaver: animated Clawd built from primitives. All coords hang off
+// (cx, cy) so the sine bob moves the whole crab; timings per the spec:
+// bob ~2.5s period, blink 150ms every 3.4s, left-claw wave 1s every 7s.
 template <typename G>
 void drawCrab(G& g) {
   g.fillRect(0, 0, W, H, C_BG);
+
+  uint32_t t = millis();
+  int cx = W / 2;
+  int cy = H / 2 + 20 + (int)(sinf(t * 0.0025f) * 4.0f); // bob
+
+  uint32_t wp = t % 7000; // left claw lifts for 1s every 7s
+  int lift = wp < 1000 ? (int)(sinf(wp * (float)M_PI / 1000.0f) * 18.0f) : 0;
+
+  // Legs (under the body), three per side, doubled lines for thickness.
+  for (int i = 0; i < 3; i++) {
+    int lx = 18 + i * 16;
+    g.drawLine(cx - lx, cy + 36, cx - lx - 12, cy + 54, C_CRAB_DK);
+    g.drawLine(cx - lx + 1, cy + 36, cx - lx - 11, cy + 54, C_CRAB_DK);
+    g.drawLine(cx + lx, cy + 36, cx + lx + 12, cy + 54, C_CRAB_DK);
+    g.drawLine(cx + lx - 1, cy + 36, cx + lx + 11, cy + 54, C_CRAB_DK);
+  }
+
+  // Arm joints + claws (drawn before the body so it covers the seams).
+  g.fillCircle(cx - 66, cy - 2, 9, C_CRAB_DK);
+  g.fillCircle(cx + 66, cy - 2, 9, C_CRAB_DK);
+  int lcy = cy - 10 - lift;
+  g.fillCircle(cx - 88, lcy, 20, C_CRAB);
+  g.fillTriangle(cx - 88, lcy, cx - 112, lcy - 16, cx - 112, lcy + 4, C_BG); // pincer
+  g.fillCircle(cx + 88, cy - 10, 20, C_CRAB);
+  g.fillTriangle(cx + 88, cy - 10, cx + 112, cy - 26, cx + 112, cy - 6, C_BG);
+
+  // Eye stalks (body covers their roots).
+  g.fillRect(cx - 22 - 3, cy - 56, 6, 26, C_CRAB);
+  g.fillRect(cx + 22 - 3, cy - 56, 6, 26, C_CRAB);
+
+  // Body.
+  g.fillEllipse(cx, cy, 62, 46, C_CRAB);
+
+  // Eyes; blink = coral lid with a dark slit.
+  bool closed = (t % 3400) < 150;
+  for (int s = -1; s <= 1; s += 2) {
+    int ex = cx + s * 22, ey = cy - 56;
+    if (closed) {
+      g.fillCircle(ex, ey, 9, C_CRAB);
+      g.fillRect(ex - 7, ey - 1, 14, 3, C_CRAB_DK);
+    } else {
+      g.fillCircle(ex, ey, 9, C_TEXT);
+      g.fillCircle(ex, ey + 2, 4, C_BG);
+    }
+  }
+
+  // Smile (drawArc: 0 deg at 3 o'clock, clockwise; 30..150 is the bottom arc).
+  g.drawArc(cx, cy - 6, 14, 16, 30, 150, C_CRAB_DK);
 }
 
 void render() {
@@ -230,6 +281,8 @@ void setup() {
   C_TEXT = M5.Display.color565(235, 235, 240);
   C_DIM = M5.Display.color565(140, 140, 155);
   C_ACCENT = M5.Display.color565(120, 170, 255);
+  C_CRAB = M5.Display.color565(217, 119, 87);   // Claude coral #D97757
+  C_CRAB_DK = M5.Display.color565(154, 78, 54);
 
   // 8-bit sprite (75KB) fits internal RAM; the 16-bit one (150KB) does not on the
   // PSRAM-less Core. Fall back to direct draw if even this fails.
