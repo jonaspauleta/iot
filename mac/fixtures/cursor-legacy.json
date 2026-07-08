@@ -1,0 +1,9 @@
+{
+  "individualUsage": {
+    "plan": {
+      "used": 450,
+      "limit": 1000
+    }
+  },
+  "billingCycleEnd": "2025-08-01T00:00:00Z"
+}

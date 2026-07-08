@@ -1,0 +1,10 @@
+{
+  "individualUsage": {
+    "plan": {
+      "totalPercentUsed": 73.2,
+      "autoPercentUsed": 60.1,
+      "apiPercentUsed": 13.4
+    }
+  },
+  "billingCycleEnd": "2025-08-01T00:00:00Z"
+}

@@ -1,15 +1,12 @@
 {
-  "name": "m5-claude-usage",
-  "version": "1.0.0",
+  "name": "m5-usage",
+  "version": "2.0.0",
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "start": "node push.js",
-    "stdout": "node push.js --stdout",
-    "replay": "node push.js --replay",
-    "test": "node usage-parser.test.js && node push.test.js"
-  },
-  "dependencies": {
-    "serialport": "^12"
+    "start": "bun push.js",
+    "stdout": "bun push.js --stdout",
+    "replay": "bun push.js --replay",
+    "test": "bun lib/jwt.test.js && bun lib/grpcweb.test.js && bun providers/claude.test.js && bun providers/codex.test.js && bun providers/cursor.test.js && bun providers/grok.test.js && bun frame.test.js"
   }
 }
