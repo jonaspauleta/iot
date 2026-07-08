@@ -19,10 +19,11 @@ orange crab, drawn procedurally and animated.
 ## Scene
 
 - Dark background, same `C_BG` as the bars screen.
-- One large Clawd centered, roughly 120px wide, built from graphics
-  primitives on the existing 8-bit sprite: rounded orange body, two stalk
-  eyes, two claws, small legs. Coral/orange palette added alongside the
-  existing color constants.
+- One large Clawd centered: the Claude Code pixel mascot (blocky rounded
+  square with stepped corners, two dark rectangular eyes, side stubs, four
+  stub legs), rendered as a character grid scaled to ~196x140 on the existing
+  8-bit sprite. Claude coral #D97757 added alongside the existing color
+  constants.
 - Nothing else on screen: no text, no usage hint, no clock.
 
 ## Animation (~15 fps while saver is active)
