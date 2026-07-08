@@ -11,6 +11,7 @@ static const int BAR_X = 12, BAR_W = 296, BAR_H = 16;
 static const int REGION_Y0 = 42, REGION_Y1 = 224;
 static const int MAX_WIN = 4, MAX_BAR = 3;
 static const uint32_t STALE_MS = 900000; // 15 min; > default 5 min poll
+static const uint32_t SAVER_MS = 30000; // idle time before the crab takes over
 
 uint16_t C_BG, C_TRACK, C_GREEN, C_AMBER, C_RED, C_TEXT, C_DIM, C_ACCENT;
 
@@ -32,6 +33,8 @@ int nWin = 0;
 int cur = 0;
 uint32_t frameTs = 0, rxMillis = 0, lastRender = 0, refreshCueUntil = 0;
 bool haveData = false, beat = false;
+uint32_t lastBtnMillis = 0;   // boot counts as a press: saver starts 30s after boot
+bool saverActive = false;
 String lineBuf;
 
 uint16_t barColor(int p) {
@@ -160,12 +163,18 @@ void drawUI(G& g) {
   g.drawString("< prev      refresh      next >", W / 2, H - 2);
 }
 
+// Screensaver: animated Clawd. Body filled in by Task 2; stub blanks the screen.
+template <typename G>
+void drawCrab(G& g) {
+  g.fillRect(0, 0, W, H, C_BG);
+}
+
 void render() {
   if (useSprite) {
-    drawUI(canvas);
+    if (saverActive) drawCrab(canvas); else drawUI(canvas);
     canvas.pushSprite(0, 0);
   } else {
-    drawUI(M5.Display);
+    if (saverActive) drawCrab(M5.Display); else drawUI(M5.Display);
   }
 }
 
@@ -233,25 +242,39 @@ void setup() {
 void loop() {
   M5.update();
 
-  if (nWin > 0) {
-    if (M5.BtnA.wasPressed()) { cur = (cur + nWin - 1) % nWin; render(); }
-    if (M5.BtnC.wasPressed()) { cur = (cur + 1) % nWin; render(); }
-  }
-  if (M5.BtnB.wasPressed()) {
-    Serial.print("REFRESH\n");
-    refreshCueUntil = millis() + 900;
-    render();
+  bool anyBtn = M5.BtnA.wasPressed() || M5.BtnB.wasPressed() || M5.BtnC.wasPressed();
+
+  if (saverActive) {
+    if (anyBtn) { // wake; the waking press is consumed (no nav, no REFRESH)
+      saverActive = false;
+      lastBtnMillis = millis();
+      render();
+    }
+  } else {
+    if (anyBtn) lastBtnMillis = millis();
+    if (nWin > 0) {
+      if (M5.BtnA.wasPressed()) { cur = (cur + nWin - 1) % nWin; render(); }
+      if (M5.BtnC.wasPressed()) { cur = (cur + 1) % nWin; render(); }
+    }
+    if (M5.BtnB.wasPressed()) {
+      Serial.print("REFRESH\n");
+      refreshCueUntil = millis() + 900;
+      render();
+    }
+    if (millis() - lastBtnMillis > SAVER_MS) saverActive = true;
   }
 
   while (Serial.available()) {
     char c = (char)Serial.read();
     if (c == '\n') {
-      if (lineBuf.length()) { handleLine(lineBuf); lineBuf = ""; render(); }
+      // During the saver: parse silently, no render, no wake.
+      if (lineBuf.length()) { handleLine(lineBuf); lineBuf = ""; if (!saverActive) render(); }
     } else if (c != '\r') {
       if (lineBuf.length() < 800) lineBuf += c;
       else lineBuf = ""; // overflow guard
     }
   }
 
-  if (millis() - lastRender > 1000) { lastRender = millis(); render(); }
+  uint32_t tick = saverActive ? 66 : 1000; // ~15 fps for the crab, 1 Hz for bars
+  if (millis() - lastRender > tick) { lastRender = millis(); render(); }
 }
