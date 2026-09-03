@@ -4,10 +4,12 @@
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { readKeychain } = require('../lib/keychain');
 const { toUnixSeconds } = require('../lib/time');
 
 const FABLE_RE = /opus|fable/i;
+const CLAUDE_KEYCHAIN_SERVICE = 'Claude Code-credentials';
 
 // Pure: response JSON in, Bars out. No I/O.
 function parseClaude(json) {
@@ -59,18 +61,33 @@ function parseToken(raw) {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    return (parsed && parsed.claudeAiOauth && parsed.claudeAiOauth.accessToken) || null;
+    const token = parsed && parsed.claudeAiOauth && parsed.claudeAiOauth.accessToken;
+    return typeof token === 'string' && token.trim() ? token : null;
   } catch {
     return null;
   }
 }
 
-function claudeCredentialsPath() {
+function claudeConfigDir() {
   const configured = process.env.CLAUDE_CONFIG_DIR;
-  const configDir = configured && configured.trim()
+  return configured && configured.trim()
     ? configured
     : path.join(os.homedir(), '.claude-voltimum');
+}
+
+function claudeCredentialsPath() {
+  const configDir = claudeConfigDir();
   return path.join(configDir, '.credentials.json');
+}
+
+function claudeKeychainService() {
+  const configDir = claudeConfigDir();
+  const suffix = crypto
+    .createHash('sha256')
+    .update(configDir.normalize('NFC'))
+    .digest('hex')
+    .slice(0, 8);
+  return `${CLAUDE_KEYCHAIN_SERVICE}-${suffix}`;
 }
 
 function readToken() {
@@ -85,7 +102,13 @@ function readToken() {
   if (fromProfile) return fromProfile;
 
   const user = os.userInfo().username;
-  return parseToken(readKeychain('Claude Code-credentials', user));
+  const service = claudeKeychainService();
+  const fromKeychain = parseToken(readKeychain(service, user));
+  if (fromKeychain) return fromKeychain;
+  if (service !== CLAUDE_KEYCHAIN_SERVICE) {
+    return parseToken(readKeychain(CLAUDE_KEYCHAIN_SERVICE, user));
+  }
+  return null;
 }
 
 async function fetchClaude() {
@@ -116,4 +139,4 @@ async function fetchClaude() {
   }
 }
 
-module.exports = { parseClaude, fetchClaude, claudeCredentialsPath };
+module.exports = { parseClaude, fetchClaude, claudeCredentialsPath, claudeKeychainService };

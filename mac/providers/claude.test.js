@@ -1,10 +1,40 @@
 const assert = require('node:assert');
+const crypto = require('node:crypto');
+const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { parseClaude, claudeCredentialsPath } = require('./claude');
+const keychain = require('../lib/keychain');
+
+const keychainCalls = [];
+let keychainValues = new Map();
+const originalReadKeychain = keychain.readKeychain;
+keychain.readKeychain = (service, account) => {
+  keychainCalls.push({ service, account });
+  return keychainValues.get(service) || null;
+};
+
+const { parseClaude, fetchClaude, claudeCredentialsPath, claudeKeychainService } = require('./claude');
 
 const fixture = require(path.join(__dirname, '..', 'fixtures', 'claude.json'));
 const noFableFixture = require(path.join(__dirname, '..', 'fixtures', 'claude-no-fable.json'));
+
+function profileKeychainService(configDir) {
+  const suffix = crypto
+    .createHash('sha256')
+    .update(configDir.normalize('NFC'))
+    .digest('hex')
+    .slice(0, 8);
+  return `Claude Code-credentials-${suffix}`;
+}
+
+function credentials(token) {
+  return JSON.stringify({ claudeAiOauth: { accessToken: token } });
+}
+
+function setKeychainValues(values) {
+  keychainCalls.length = 0;
+  keychainValues = new Map(Object.entries(values));
+}
 
 const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
 try {
@@ -19,11 +49,29 @@ try {
     claudeCredentialsPath(),
     path.join('/tmp/m5-usage-claude-profile', '.credentials.json')
   );
+  assert.strictEqual(
+    claudeKeychainService(),
+    'Claude Code-credentials-4ac010a9'
+  );
 
   process.env.CLAUDE_CONFIG_DIR = '';
   assert.strictEqual(
     claudeCredentialsPath(),
     path.join(os.homedir(), '.claude-voltimum', '.credentials.json')
+  );
+  assert.strictEqual(
+    claudeKeychainService(),
+    profileKeychainService(path.join(os.homedir(), '.claude-voltimum'))
+  );
+
+  process.env.CLAUDE_CONFIG_DIR = '   ';
+  assert.strictEqual(
+    claudeCredentialsPath(),
+    path.join(os.homedir(), '.claude-voltimum', '.credentials.json')
+  );
+  assert.strictEqual(
+    claudeKeychainService(),
+    profileKeychainService(path.join(os.homedir(), '.claude-voltimum'))
   );
 } finally {
   if (originalClaudeConfigDir === undefined) {
@@ -76,4 +124,103 @@ const empty = parseClaude({});
 assert.strictEqual(empty.ok, false);
 assert.strictEqual(empty.e, 'err');
 
-console.log('claude: all assertions passed');
+const originalFetch = global.fetch;
+const originalClaudeConfigDirForCredentialTests = process.env.CLAUDE_CONFIG_DIR;
+
+async function testCredentialSources() {
+  let authorization;
+  global.fetch = async (_url, options) => {
+    authorization = options.headers.Authorization;
+    return {
+      ok: true,
+      status: 200,
+      json: async () => fixture,
+    };
+  };
+
+  const customProfile = fs.mkdtempSync(path.join(os.tmpdir(), 'm5-usage-claude-'));
+  try {
+    const customService = profileKeychainService(customProfile);
+    process.env.CLAUDE_CONFIG_DIR = customProfile;
+    setKeychainValues({ [customService]: credentials('scoped-token') });
+
+    let result = await fetchClaude();
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(authorization, 'Bearer scoped-token');
+    assert.deepStrictEqual(
+      keychainCalls.map((call) => call.service),
+      [customService]
+    );
+
+    const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'm5-usage-claude-'));
+    try {
+      fs.writeFileSync(
+        path.join(profileDir, '.credentials.json'),
+        credentials('file-token')
+      );
+      process.env.CLAUDE_CONFIG_DIR = profileDir;
+      setKeychainValues({
+        [profileKeychainService(profileDir)]: credentials('keychain-token'),
+      });
+
+      result = await fetchClaude();
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(authorization, 'Bearer file-token');
+      assert.deepStrictEqual(keychainCalls, []);
+
+      fs.writeFileSync(path.join(profileDir, '.credentials.json'), '{malformed');
+      setKeychainValues({
+        [profileKeychainService(profileDir)]: credentials('scoped-fallback-token'),
+      });
+
+      result = await fetchClaude();
+      assert.strictEqual(result.ok, true);
+      assert.strictEqual(authorization, 'Bearer scoped-fallback-token');
+    } finally {
+      fs.rmSync(profileDir, { recursive: true, force: true });
+    }
+
+    process.env.CLAUDE_CONFIG_DIR = customProfile;
+    setKeychainValues({
+      [customService]: null,
+      'Claude Code-credentials': credentials('legacy-token'),
+    });
+    result = await fetchClaude();
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(authorization, 'Bearer legacy-token');
+    assert.deepStrictEqual(
+      keychainCalls.map((call) => call.service),
+      [customService, 'Claude Code-credentials']
+    );
+
+    setKeychainValues({
+      [customService]: JSON.stringify({ claudeAiOauth: { accessToken: { invalid: true } } }),
+      'Claude Code-credentials': credentials('legacy-after-invalid-token'),
+    });
+    result = await fetchClaude();
+    assert.strictEqual(result.ok, true);
+    assert.strictEqual(authorization, 'Bearer legacy-after-invalid-token');
+
+    setKeychainValues({});
+    result = await fetchClaude();
+    assert.deepStrictEqual(result, { n: 'Claude', ok: false, bars: [], e: 'reauth' });
+  } finally {
+    fs.rmSync(customProfile, { recursive: true, force: true });
+  }
+}
+
+testCredentialSources()
+  .then(() => console.log('claude: all assertions passed'))
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    keychain.readKeychain = originalReadKeychain;
+    global.fetch = originalFetch;
+    if (originalClaudeConfigDirForCredentialTests === undefined) {
+      delete process.env.CLAUDE_CONFIG_DIR;
+    } else {
+      process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDirForCredentialTests;
+    }
+  });
