@@ -1,7 +1,7 @@
 # OpenCode Logo Screensaver and Provider Marks
 
 Date: 2026-09-03
-Status: Design approved, pending written-spec review
+Status: Approved for planning
 
 ## Summary
 
