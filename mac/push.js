@@ -10,18 +10,29 @@ const { fetchCodex } = require('./providers/codex');
 const { fetchCursor } = require('./providers/cursor');
 const { fetchGrok } = require('./providers/grok');
 
+const PROVIDERS = [
+  { name: 'Claude', fetch: fetchClaude },
+  { name: 'Codex', fetch: fetchCodex },
+  { name: 'Cursor', fetch: fetchCursor },
+  { name: 'Grok', fetch: fetchGrok },
+];
+
 const POLL_MS = Number(process.env.POLL_MS || 300000);
 const PORT_PATH = process.env.PORT || null;
 const MODE = process.argv[2] || '';
 
+async function collectWindows(providers) {
+  const results = await Promise.allSettled(
+    providers.map((provider) => Promise.resolve().then(() => provider.fetch()))
+  );
+  return results.map((result, i) => {
+    if (result.status === 'fulfilled') return result.value;
+    return { n: providers[i].name, ok: false, bars: [], e: 'err' };
+  });
+}
+
 async function gather() {
-  // Each fetch<P> never throws; a failed provider comes back as a degraded window.
-  const wins = await Promise.all([
-    fetchClaude(),
-    fetchCodex(),
-    fetchCursor(),
-    fetchGrok(),
-  ]);
+  const wins = await collectWindows(PROVIDERS);
   return buildFrame(wins, Date.now() / 1000);
 }
 
@@ -173,4 +184,4 @@ async function main() {
 
 if (import.meta.main) main();
 
-module.exports = { gather, summarize };
+module.exports = { gather, summarize, collectWindows };

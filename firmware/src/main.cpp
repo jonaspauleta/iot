@@ -26,7 +26,6 @@ struct Win {
   char e[8];
   Bar bar[MAX_BAR];
   int nbar;
-  bool haveGood;
 };
 
 Win win[MAX_WIN];
@@ -246,7 +245,6 @@ void handleLine(const String& line) {
         j++;
       }
       d.nbar = j;
-      d.haveGood = true;
     }
     // else keep previous bars (last-good); only ok/e were refreshed.
     i++;

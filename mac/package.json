@@ -7,6 +7,6 @@
     "start": "bun push.js",
     "stdout": "bun push.js --stdout",
     "replay": "bun push.js --replay",
-    "test": "bun lib/jwt.test.js && bun lib/grpcweb.test.js && bun providers/claude.test.js && bun providers/codex.test.js && bun providers/cursor.test.js && bun providers/grok.test.js && bun frame.test.js"
+    "test": "bun lib/jwt.test.js && bun lib/grpcweb.test.js && bun providers/claude.test.js && bun providers/codex.test.js && bun providers/cursor.test.js && bun providers/grok.test.js && bun frame.test.js && bun push.test.js && bash ../pusher.test.sh"
   }
 }

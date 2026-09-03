@@ -18,8 +18,8 @@ serial. The device is a pure display.
 - [Bun](https://bun.sh) (`bun --version`, 1.3+).
 - PlatformIO (`pio --version`; `pipx install platformio` or `brew install platformio`).
 - An M5Stack Core (Basic) connected over USB.
-- Each provider logged in on this Mac (one-time), so its token sits on disk:
-  - **Claude:** `claude` logged in (token in the macOS Keychain).
+- Each provider logged in on this Mac (one-time), so its local credentials are available:
+  - **Claude:** Claude Code logged in with the `~/.claude-voltimum` profile (or the profile selected by `CLAUDE_CONFIG_DIR`).
   - **Codex:** `~/.codex/auth.json` present (ChatGPT/Codex login).
   - **Cursor:** `cursor-agent login` done once (token in the Keychain).
   - **Grok:** `~/.grok/auth.json` present (`grok` login).
@@ -49,13 +49,17 @@ bar means that metric has no cap / is unknown.
 
 ### First-run Keychain prompt
 
-The Claude and Cursor tokens live in the macOS Keychain. The first time `bun`
-reads them, macOS may pop a "confidential information" dialog. Click **Always
+The Claude provider reads the selected profile's `.credentials.json` first and
+falls back to its macOS Keychain item when that file has no usable token. Cursor
+still reads its token from the macOS Keychain. The first time `bun` reads a
+Keychain item, macOS may pop a "confidential information" dialog. Click **Always
 Allow** so the pusher keeps working unattended (e.g. after a reboot).
 
 ### Options
 
 - `PORT=/dev/cu.usbserial-XXXX bun start` to pin the serial port.
+- `CLAUDE_CONFIG_DIR=/path/to/profile bun start` to select a different Claude Code profile.
+- `CLAUDE_CONFIG_DIR=/path/to/profile ./pusher.sh start` to pass that profile to the LaunchAgent.
 - `POLL_MS=600000 bun start` to change the poll interval (default 300000, 5 min).
   Keep it multi-minute; the provider endpoints throttle frequent polling.
 - `bun run replay` to cycle synthetic multi-window frames (no network) for a
@@ -70,7 +74,8 @@ bun run test
 ```
 
 Unit tests cover the gRPC-web/protobuf scanner, JWT decode, each provider's pure
-parser (against synthetic fixtures, no secrets), and the frame normalizer.
+parser (against synthetic fixtures, no secrets), provider collection, and the
+frame normalizer.
 
 ## How it works
 
@@ -94,8 +99,8 @@ firmware pages windows, renders bars, extrapolates reset countdowns, sends REFRE
 - "no usbserial port found": check the cable, or set `PORT=` explicitly.
 - A window is stuck on `reauth` / `stale`: run that provider's CLI once to refresh
   its token (Claude/Grok tokens are short-lived and go stale if the CLI is idle).
+  For a custom Claude profile, use the same `CLAUDE_CONFIG_DIR` value as the pusher.
 - `Resource temporarily unavailable` when flashing: the pusher (or a serial
   monitor) is holding the port. Stop `bun start`, flash, then restart it.
 - Do not run a PlatformIO serial monitor while `bun start` is running; they
   contend for the same port.
-```

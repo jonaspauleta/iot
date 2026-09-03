@@ -15,6 +15,20 @@ MACDIR="$ROOT/mac"
 BUN="$(command -v bun || echo "$HOME/.bun/bin/bun")"
 LOG="$HOME/Library/Logs/m5-usage.log"
 DOMAIN="gui/$(id -u)"
+CLAUDE_CONFIG_DIR_VALUE="${CLAUDE_CONFIG_DIR:-$HOME/.claude-voltimum}"
+
+xml_escape() {
+  local value="$1"
+  value="${value//&/&amp;}"
+  value="${value//</&lt;}"
+  value="${value//>/&gt;}"
+  printf '%s' "$value"
+}
+
+BUN_XML="$(xml_escape "$BUN")"
+MACDIR_XML="$(xml_escape "$MACDIR")"
+LOG_XML="$(xml_escape "$LOG")"
+CLAUDE_CONFIG_DIR_XML="$(xml_escape "$CLAUDE_CONFIG_DIR_VALUE")"
 
 write_plist() {
   mkdir -p "$(dirname "$PLIST")" "$(dirname "$LOG")"
@@ -26,14 +40,18 @@ write_plist() {
     <key>Label</key>            <string>$LABEL</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$BUN</string>
+        <string>$BUN_XML</string>
         <string>push.js</string>
     </array>
-    <key>WorkingDirectory</key>  <string>$MACDIR</string>
+    <key>WorkingDirectory</key>  <string>$MACDIR_XML</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CLAUDE_CONFIG_DIR</key><string>$CLAUDE_CONFIG_DIR_XML</string>
+    </dict>
     <key>RunAtLoad</key>         <true/>
     <key>KeepAlive</key>         <true/>
-    <key>StandardOutPath</key>   <string>$LOG</string>
-    <key>StandardErrorPath</key> <string>$LOG</string>
+    <key>StandardOutPath</key>   <string>$LOG_XML</string>
+    <key>StandardErrorPath</key> <string>$LOG_XML</string>
 </dict>
 </plist>
 EOF

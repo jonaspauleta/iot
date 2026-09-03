@@ -1,6 +1,6 @@
-// Claude usage provider. Reads the OAuth token the `claude` CLI keeps fresh in the
-// macOS Keychain (falling back to the on-disk credentials file), fetches usage from
-// Anthropic's internal oauth/usage endpoint, and normalizes it into bars.
+// Claude usage provider. Reads the OAuth token from the configured Claude Code
+// profile (falling back to the macOS Keychain), fetches usage from Anthropic's
+// internal oauth/usage endpoint, and normalizes it into bars.
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -55,17 +55,7 @@ function parseClaude(json) {
   return { ok: true, bars };
 }
 
-function readToken() {
-  const user = os.userInfo().username;
-  const fromKeychain = readKeychain('Claude Code-credentials', user);
-  let raw = fromKeychain;
-  if (!raw) {
-    try {
-      raw = fs.readFileSync(path.join(os.homedir(), '.claude', '.credentials.json'), 'utf8');
-    } catch {
-      raw = null;
-    }
-  }
+function parseToken(raw) {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -73,6 +63,29 @@ function readToken() {
   } catch {
     return null;
   }
+}
+
+function claudeCredentialsPath() {
+  const configured = process.env.CLAUDE_CONFIG_DIR;
+  const configDir = configured && configured.trim()
+    ? configured
+    : path.join(os.homedir(), '.claude-voltimum');
+  return path.join(configDir, '.credentials.json');
+}
+
+function readToken() {
+  let raw = null;
+  try {
+    raw = fs.readFileSync(claudeCredentialsPath(), 'utf8');
+  } catch {
+    raw = null;
+  }
+
+  const fromProfile = parseToken(raw);
+  if (fromProfile) return fromProfile;
+
+  const user = os.userInfo().username;
+  return parseToken(readKeychain('Claude Code-credentials', user));
 }
 
 async function fetchClaude() {
@@ -103,4 +116,4 @@ async function fetchClaude() {
   }
 }
 
-module.exports = { parseClaude, fetchClaude };
+module.exports = { parseClaude, fetchClaude, claudeCredentialsPath };

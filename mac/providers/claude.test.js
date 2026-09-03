@@ -1,9 +1,37 @@
 const assert = require('node:assert');
+const os = require('node:os');
 const path = require('node:path');
-const { parseClaude } = require('./claude');
+const { parseClaude, claudeCredentialsPath } = require('./claude');
 
 const fixture = require(path.join(__dirname, '..', 'fixtures', 'claude.json'));
 const noFableFixture = require(path.join(__dirname, '..', 'fixtures', 'claude-no-fable.json'));
+
+const originalClaudeConfigDir = process.env.CLAUDE_CONFIG_DIR;
+try {
+  delete process.env.CLAUDE_CONFIG_DIR;
+  assert.strictEqual(
+    claudeCredentialsPath(),
+    path.join(os.homedir(), '.claude-voltimum', '.credentials.json')
+  );
+
+  process.env.CLAUDE_CONFIG_DIR = '/tmp/m5-usage-claude-profile';
+  assert.strictEqual(
+    claudeCredentialsPath(),
+    path.join('/tmp/m5-usage-claude-profile', '.credentials.json')
+  );
+
+  process.env.CLAUDE_CONFIG_DIR = '';
+  assert.strictEqual(
+    claudeCredentialsPath(),
+    path.join(os.homedir(), '.claude-voltimum', '.credentials.json')
+  );
+} finally {
+  if (originalClaudeConfigDir === undefined) {
+    delete process.env.CLAUDE_CONFIG_DIR;
+  } else {
+    process.env.CLAUDE_CONFIG_DIR = originalClaudeConfigDir;
+  }
+}
 
 // Full fixture: five_hour, seven_day, and a limits[] Fable entry.
 const parsed = parseClaude(fixture);
