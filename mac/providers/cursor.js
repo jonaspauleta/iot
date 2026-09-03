@@ -15,34 +15,32 @@ function parseCursor(json) {
 
   const iu = json.individualUsage || {};
   const plan = iu.plan || {};
-  const overall = iu.overall || {};
-  const teamPooled = (json.teamUsage && json.teamUsage.pooled) || {};
-
   const reset = toUnixSeconds(json.billingCycleEnd);
-
-  let total = -1;
-  if (isNum(plan.totalPercentUsed)) {
-    total = plan.totalPercentUsed;
-  } else if (isNum(plan.autoPercentUsed) && isNum(plan.apiPercentUsed)) {
-    total = (plan.autoPercentUsed + plan.apiPercentUsed) / 2;
-  } else if (isNum(plan.used) && isNum(plan.limit) && plan.limit !== 0) {
-    total = (plan.used / plan.limit) * 100;
-  } else if (isNum(overall.used) && isNum(overall.limit) && overall.limit !== 0) {
-    total = (overall.used / overall.limit) * 100;
-  } else if (isNum(teamPooled.used) && isNum(teamPooled.limit) && teamPooled.limit !== 0) {
-    total = (teamPooled.used / teamPooled.limit) * 100;
-  }
-
-  const auto = isNum(plan.autoPercentUsed) ? plan.autoPercentUsed : -1;
-  const api = isNum(plan.apiPercentUsed) ? plan.apiPercentUsed : -1;
 
   return {
     ok: true,
     bars: [
-      { l: 'Total', p: total, r: reset },
-      { l: 'Auto', p: auto, r: reset },
-      { l: 'API', p: api, r: reset },
+      {
+        l: '1st party models',
+        p: isNum(plan.autoPercentUsed) ? plan.autoPercentUsed : -1,
+        r: reset,
+      },
+      {
+        l: '3rd party models',
+        p: isNum(plan.apiPercentUsed) ? plan.apiPercentUsed : -1,
+        r: reset,
+      },
+      { l: 'grok bot', p: -1, r: 0 },
     ],
+  };
+}
+
+// PURE: optional Cursor Bot response in, one bar value out. No I/O.
+function parseCursorBot(json) {
+  if (!json || !isNum(json.usagePercent)) return { p: -1, r: 0 };
+  return {
+    p: json.usagePercent,
+    r: toUnixSeconds(json.nextResetTimestampUtc),
   };
 }
 
@@ -88,4 +86,4 @@ async function fetchCursor() {
   }
 }
 
-module.exports = { parseCursor, fetchCursor };
+module.exports = { parseCursor, parseCursorBot, fetchCursor };

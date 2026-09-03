@@ -1,48 +1,45 @@
 const assert = require('node:assert');
 const path = require('node:path');
-const { parseCursor } = require('./cursor');
+const { parseCursor, parseCursorBot } = require('./cursor');
 
 const modernFixture = require(path.join(__dirname, '..', 'fixtures', 'cursor.json'));
 const legacyFixture = require(path.join(__dirname, '..', 'fixtures', 'cursor-legacy.json'));
+const botFixture = require(path.join(__dirname, '..', 'fixtures', 'cursor-bot.json'));
+const expectedReset = 1754006400;
 
-// Modern fixture: individualUsage.plan.{totalPercentUsed,autoPercentUsed,apiPercentUsed}
-// + billingCycleEnd -> 3 bars, shared reset.
+// Modern fixture: individualUsage.plan.{autoPercentUsed,apiPercentUsed}
+// + billingCycleEnd -> the two core bars and an unknown Bot bar.
 {
   const parsed = parseCursor(modernFixture);
   assert.strictEqual(parsed.ok, true);
-  assert.strictEqual(parsed.bars.length, 3);
-
-  const [total, auto, api] = parsed.bars;
-  assert.strictEqual(total.l, 'Total');
-  assert.strictEqual(total.p, 73.2);
-  assert.strictEqual(auto.l, 'Auto');
-  assert.strictEqual(auto.p, 60.1);
-  assert.strictEqual(api.l, 'API');
-  assert.strictEqual(api.p, 13.4);
-
-  const expectedReset = 1754006400; // toUnixSeconds('2025-08-01T00:00:00Z')
-  assert.strictEqual(total.r, expectedReset);
-  assert.strictEqual(auto.r, expectedReset);
-  assert.strictEqual(api.r, expectedReset);
+  assert.deepStrictEqual(parsed.bars, [
+    { l: '1st party models', p: 60.1, r: expectedReset },
+    { l: '3rd party models', p: 13.4, r: expectedReset },
+    { l: 'grok bot', p: -1, r: 0 },
+  ]);
 }
 
-// Legacy fixture: no *PercentUsed, but plan.used/plan.limit -> Total falls back to
-// the ratio, Auto/API stay -1 (unknown).
+// Legacy fixture: no *PercentUsed values, so both core source bars are unknown.
 {
   const parsed = parseCursor(legacyFixture);
   assert.strictEqual(parsed.ok, true);
-  assert.strictEqual(parsed.bars.length, 3);
+  assert.deepStrictEqual(parsed.bars, [
+    { l: '1st party models', p: -1, r: expectedReset },
+    { l: '3rd party models', p: -1, r: expectedReset },
+    { l: 'grok bot', p: -1, r: 0 },
+  ]);
+}
 
-  const [total, auto, api] = parsed.bars;
-  assert.strictEqual(total.l, 'Total');
-  assert.strictEqual(total.p, 45); // 450/1000*100
-  assert.strictEqual(auto.l, 'Auto');
-  assert.strictEqual(auto.p, -1);
-  assert.strictEqual(api.l, 'API');
-  assert.strictEqual(api.p, -1);
+// Optional Bot fixture: usagePercent + nextResetTimestampUtc -> one bar value.
+{
+  const bot = parseCursorBot(botFixture);
+  assert.deepStrictEqual(bot, { p: 82.5, r: 1754137800 });
+}
 
-  const expectedReset = 1754006400;
-  assert.strictEqual(total.r, expectedReset);
+// Missing or malformed Bot responses remain unknown.
+{
+  assert.deepStrictEqual(parseCursorBot({}), { p: -1, r: 0 });
+  assert.deepStrictEqual(parseCursorBot({ usagePercent: '82.5' }), { p: -1, r: 0 });
 }
 
 // No individualUsage/teamUsage at all -> {ok:false, e:'err'}.
