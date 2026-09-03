@@ -148,13 +148,13 @@ async function replay() {
     { v: 1, w: [
       { n: 'Claude', ok: 1, b: [ { l: '5h', p: 8, r: now + 2 * H }, { l: '7d', p: 44, r: now + 2 * D }, { l: 'Fable', p: 12, r: now + 2 * D } ] },
       { n: 'Codex', ok: 1, b: [ { l: '5h', p: 30, r: now + H }, { l: '7d', p: 61, r: now + 3 * D } ] },
-      { n: 'Cursor', ok: 1, b: [ { l: 'Total', p: 73, r: now + 20 * D }, { l: 'Auto', p: 66, r: now + 20 * D }, { l: 'API', p: 9, r: now + 20 * D } ] },
+      { n: 'Cursor', ok: 1, b: [ { l: '1st party models', p: 66, r: now + 20 * D }, { l: '3rd party models', p: 9, r: now + 20 * D }, { l: 'grok bot', p: 73, r: now + 20 * D } ] },
       { n: 'Grok', ok: 1, b: [ { l: 'Credits', p: 88, r: now + 4 * D } ] },
     ] },
     { v: 1, w: [
       { n: 'Claude', ok: 1, b: [ { l: '5h', p: 97, r: now + 20 * 60 }, { l: '7d', p: 82, r: now + D }, { l: 'Fable', p: 100, r: now + D } ] },
       { n: 'Codex', ok: 0, e: 'reauth', b: [] },
-      { n: 'Cursor', ok: 1, b: [ { l: 'Total', p: 51, r: now + 10 * D }, { l: 'Auto', p: 40, r: now + 10 * D }, { l: 'API', p: -1, r: 0 } ] },
+      { n: 'Cursor', ok: 1, b: [ { l: '1st party models', p: 40, r: now + 10 * D }, { l: '3rd party models', p: -1, r: 0 }, { l: 'grok bot', p: -1, r: 0 } ] },
       { n: 'Grok', ok: 0, e: 'stale', b: [ { l: 'Credits', p: 5, r: now + D } ] },
     ] },
   ];

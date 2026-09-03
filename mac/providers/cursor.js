@@ -44,6 +44,19 @@ function parseCursorBot(json) {
   };
 }
 
+async function fetchCursorBot(cookie, request = fetch) {
+  try {
+    const res = await request('https://cursor.com/api/dashboard/get-sand-usage-status', {
+      method: 'POST',
+      headers: { Cookie: cookie, Accept: 'application/json' },
+    });
+    if (!res.ok) return { p: -1, r: 0 };
+    return parseCursorBot(await res.json());
+  } catch {
+    return { p: -1, r: 0 };
+  }
+}
+
 // Reads Keychain creds + HTTP + parse<P>. Never throws.
 async function fetchCursor() {
   try {
@@ -80,10 +93,19 @@ async function fetchCursor() {
     const body = await res.json();
     const parsed = parseCursor(body);
     if (!parsed.ok) return { n: 'Cursor', ok: false, bars: [], e: parsed.e };
-    return { n: 'Cursor', ok: true, bars: parsed.bars };
+    const bot = await fetchCursorBot(cookie);
+    return {
+      n: 'Cursor',
+      ok: true,
+      bars: [parsed.bars[0], parsed.bars[1], {
+        l: 'grok bot',
+        p: bot.p,
+        r: bot.r,
+      }],
+    };
   } catch {
     return { n: 'Cursor', ok: false, bars: [], e: 'err' };
   }
 }
 
-module.exports = { parseCursor, parseCursorBot, fetchCursor };
+module.exports = { parseCursor, parseCursorBot, fetchCursorBot, fetchCursor };
