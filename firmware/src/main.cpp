@@ -11,10 +11,9 @@ static const int BAR_X = 12, BAR_W = 296, BAR_H = 16;
 static const int REGION_Y0 = 42, REGION_Y1 = 224;
 static const int MAX_WIN = 4, MAX_BAR = 3;
 static const uint32_t STALE_MS = 900000; // 15 min; > default 5 min poll
-static const uint32_t SAVER_MS = 30000; // idle time before the crab takes over
+static const uint32_t SAVER_MS = 30000; // idle time before the OpenCode mark takes over
 
 uint16_t C_BG, C_TRACK, C_GREEN, C_AMBER, C_RED, C_TEXT, C_DIM, C_ACCENT;
-uint16_t C_CRAB;
 uint16_t C_OPENCODE, C_CLAUDE, C_CODEX, C_CURSOR, C_GROK;
 
 M5Canvas canvas(&M5.Display);
@@ -191,58 +190,43 @@ void drawUI(G& g) {
   g.drawString("< prev      refresh      next >", W / 2, H - 2);
 }
 
-// Screensaver: Clawd, the Claude Code mascot, drawn as a scaled pixel grid.
-// o = body, # = eye, . = empty. Bob ~2.5s, blink 150ms every 3.4s, the left
-// side stub wiggles for 1s every 7s.
-static const char* CLAWD[] = {
-  "..oooooooooo..",
-  ".oooooooooooo.",
-  ".oooooooooooo.",
-  ".ooo#oooo#ooo.",
-  ".ooo#oooo#ooo.",
-  "oooooooooooooo",
-  "oooooooooooooo",
-  ".oooooooooooo.",
-  "..oooooooooo..",
-  "..o..o..o..o..",
-};
-static const int CROWS = 10, CCOLS = 14, CELL = 14;
+// Screensaver: the OpenCode square mark, drawn from primitives and animated
+// with a restrained vertical float. The outer corners are stepped to match the
+// selected square direction without storing bitmap data.
+static const int OPENCODE_GRID = 7;
+static const int OPENCODE_CELL = 14;
+static const int OPENCODE_GAP = 2;
 
 template <typename G>
-void drawCrab(G& g) {
+void drawOpenCodeMark(G& g) {
   g.fillRect(0, 0, W, H, C_BG);
 
   uint32_t t = millis();
-  int x0 = (W - CCOLS * CELL) / 2;
-  int y0 = (H - CROWS * CELL) / 2 + (int)(sinf(t * 0.0025f) * 4.0f); // bob
+  int markW = OPENCODE_GRID * OPENCODE_CELL + (OPENCODE_GRID - 1) * OPENCODE_GAP;
+  int x0 = (W - markW) / 2;
+  int y0 = (H - markW) / 2 + (int)(sinf(t * 0.0025f) * 4.0f);
 
-  uint32_t wp = t % 7000;
-  int lift = wp < 1000 ? (int)(sinf(wp * (float)M_PI / 1000.0f) * 8.0f) : 0;
-  bool closed = (t % 3400) < 150;
+  for (int r = 0; r < OPENCODE_GRID; r++) {
+    for (int c = 0; c < OPENCODE_GRID; c++) {
+      bool topOrBottom = r == 0 || r == OPENCODE_GRID - 1;
+      bool side = c == 0 || c == OPENCODE_GRID - 1;
+      bool filled = (topOrBottom && c >= 1 && c <= OPENCODE_GRID - 2) ||
+                    (!topOrBottom && side && r >= 1 && r <= OPENCODE_GRID - 2);
+      if (!filled) continue;
 
-  for (int r = 0; r < CROWS; r++) {
-    for (int c = 0; c < CCOLS; c++) {
-      char ch = CLAWD[r][c];
-      if (ch == '.') continue;
-      int x = x0 + c * CELL;
-      int y = y0 + r * CELL - (c == 0 ? lift : 0); // wiggle the left stub column
-      bool eye = ch == '#' && !closed;
-      g.fillRect(x, y, CELL, CELL, eye ? C_BG : C_CRAB);
+      int x = x0 + c * (OPENCODE_CELL + OPENCODE_GAP);
+      int y = y0 + r * (OPENCODE_CELL + OPENCODE_GAP);
+      g.fillRect(x, y, OPENCODE_CELL, OPENCODE_CELL, C_OPENCODE);
     }
-  }
-  if (closed) { // lids: a dark slit across the bottom of each eye
-    int ey = y0 + 5 * CELL - 4;
-    g.fillRect(x0 + 4 * CELL, ey, CELL, 4, C_BG);
-    g.fillRect(x0 + 9 * CELL, ey, CELL, 4, C_BG);
   }
 }
 
 void render() {
   if (useSprite) {
-    if (saverActive) drawCrab(canvas); else drawUI(canvas);
+    if (saverActive) drawOpenCodeMark(canvas); else drawUI(canvas);
     canvas.pushSprite(0, 0);
   } else {
-    if (saverActive) drawCrab(M5.Display); else drawUI(M5.Display);
+    if (saverActive) drawOpenCodeMark(M5.Display); else drawUI(M5.Display);
   }
 }
 
@@ -297,7 +281,6 @@ void setup() {
   C_TEXT = M5.Display.color565(235, 235, 240);
   C_DIM = M5.Display.color565(140, 140, 155);
   C_ACCENT = M5.Display.color565(120, 170, 255);
-  C_CRAB = M5.Display.color565(217, 119, 87);   // Claude coral #D97757
   C_OPENCODE = M5.Display.color565(207, 206, 205);
   C_CLAUDE = M5.Display.color565(217, 119, 87);
   C_CODEX = M5.Display.color565(159, 227, 181);
@@ -348,6 +331,6 @@ void loop() {
     }
   }
 
-  uint32_t tick = saverActive ? 66 : 1000; // ~15 fps for the crab, 1 Hz for bars
+  uint32_t tick = saverActive ? 66 : 1000; // ~15 fps for the OpenCode mark, 1 Hz for bars
   if (millis() - lastRender > tick) { lastRender = millis(); render(); }
 }
