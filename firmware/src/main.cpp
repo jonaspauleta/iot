@@ -1,5 +1,6 @@
 #include <M5Unified.h>
 #include <ArduinoJson.h>
+#include "brand_marks.h"
 
 // Multi-provider usage display. The Mac pushes one JSON frame per poll carrying
 // up to four provider "windows"; we page between them with the buttons and render
@@ -19,7 +20,9 @@ uint16_t C_OPENCODE, C_CLAUDE, C_CODEX, C_CURSOR, C_GROK;
 M5Canvas canvas(&M5.Display);
 bool useSprite = false;
 
-struct Bar { int p; uint32_t r; char l[10]; };
+struct Bar { int p; uint32_t r; char l[17]; };
+static_assert(sizeof("1st party models") <= sizeof(((Bar*)nullptr)->l), "Cursor label buffer too small");
+static_assert(sizeof("3rd party models") <= sizeof(((Bar*)nullptr)->l), "Cursor label buffer too small");
 struct Win {
   char n[12];
   bool ok;
@@ -63,27 +66,27 @@ void fmtRel(uint32_t r, char* out, size_t n) {
 
 template <typename G>
 void drawProviderMark(G& g, const char* name, int x, int y) {
+  const BrandMask* mark = nullptr;
+  uint16_t color = C_DIM;
+
   if (strcmp(name, "Claude") == 0) {
-    // Coral C mark.
-    g.fillCircle(x + 6, y + 6, 5, C_CLAUDE);
-    g.fillRect(x + 6, y + 1, 6, 10, C_BG);
+    mark = &BRAND_CLAUDE;
+    color = C_CLAUDE;
   } else if (strcmp(name, "Codex") == 0) {
-    // Small mint three-spoke OpenAI/Codex-style knot.
-    g.drawLine(x + 6, y + 1, x + 6, y + 11, C_CODEX);
-    g.drawLine(x + 1, y + 3, x + 11, y + 9, C_CODEX);
-    g.drawLine(x + 1, y + 9, x + 11, y + 3, C_CODEX);
-    g.fillCircle(x + 6, y + 6, 2, C_CODEX);
+    mark = &BRAND_CODEX;
+    color = C_CODEX;
   } else if (strcmp(name, "Cursor") == 0) {
-    // Light hollow cursor chevron.
-    g.fillTriangle(x + 2, y + 1, x + 2, y + 11, x + 10, y + 7, C_CURSOR);
-    g.fillTriangle(x + 4, y + 4, x + 4, y + 8, x + 8, y + 7, C_BG);
+    mark = &BRAND_CURSOR;
+    color = C_CURSOR;
   } else if (strcmp(name, "Grok") == 0) {
-    // Blue X mark.
-    g.drawLine(x + 2, y + 2, x + 10, y + 10, C_GROK);
-    g.drawLine(x + 10, y + 2, x + 2, y + 10, C_GROK);
+    mark = &BRAND_GROK;
+    color = C_GROK;
+  }
+
+  if (mark) {
+    drawBrandMask(g, *mark, x, y, color);
   } else {
-    // Neutral fallback for an unknown future window name.
-    g.fillRoundRect(x + 2, y + 2, 8, 8, 2, C_DIM);
+    g.fillRoundRect(x + 4, y + 4, 8, 8, 2, C_DIM);
   }
 }
 
@@ -135,8 +138,8 @@ void drawUI(G& g) {
   g.setFont(&fonts::FreeSansBold12pt7b);
   g.setTextColor(C_TEXT);
   g.setTextDatum(TL_DATUM);
-  drawProviderMark(g, w.n, BAR_X, 8);
-  g.drawString(w.n, BAR_X + 17, 6);
+  drawProviderMark(g, w.n, BAR_X, 6);
+  g.drawString(w.n, BAR_X + 21, 6);
 
   g.fillCircle(W - 14, 14, 4, beat ? C_GREEN : C_TRACK);
 
@@ -190,35 +193,20 @@ void drawUI(G& g) {
   g.drawString("< prev      refresh      next >", W / 2, H - 2);
 }
 
-// Screensaver: the OpenCode square mark, drawn from primitives and animated
-// with a restrained vertical float. The outer corners are stepped to match the
-// selected square direction without storing bitmap data.
-static const int OPENCODE_GRID = 7;
-static const int OPENCODE_CELL = 14;
-static const int OPENCODE_GAP = 2;
+// Screensaver: official OpenCode square mark with a restrained vertical float.
+static const int OPENCODE_W = 96;
+static const int OPENCODE_H = 120;
 
 template <typename G>
 void drawOpenCodeMark(G& g) {
   g.fillRect(0, 0, W, H, C_BG);
 
-  uint32_t t = millis();
-  int markW = OPENCODE_GRID * OPENCODE_CELL + (OPENCODE_GRID - 1) * OPENCODE_GAP;
-  int x0 = (W - markW) / 2;
-  int y0 = (H - markW) / 2 + (int)(sinf(t * 0.0025f) * 4.0f);
+  int x = (W - OPENCODE_W) / 2;
+  int y = (H - OPENCODE_H) / 2 + (int)(sinf(millis() * 0.0013f) * 3.0f);
 
-  for (int r = 0; r < OPENCODE_GRID; r++) {
-    for (int c = 0; c < OPENCODE_GRID; c++) {
-      bool topOrBottom = r == 0 || r == OPENCODE_GRID - 1;
-      bool side = c == 0 || c == OPENCODE_GRID - 1;
-      bool filled = (topOrBottom && c >= 1 && c <= OPENCODE_GRID - 2) ||
-                    (!topOrBottom && side && r >= 1 && r <= OPENCODE_GRID - 2);
-      if (!filled) continue;
-
-      int x = x0 + c * (OPENCODE_CELL + OPENCODE_GAP);
-      int y = y0 + r * (OPENCODE_CELL + OPENCODE_GAP);
-      g.fillRect(x, y, OPENCODE_CELL, OPENCODE_CELL, C_OPENCODE);
-    }
-  }
+  // Source geometry is a 240x300 outer form with a 120x180 opening, scaled 0.4x.
+  g.fillRect(x, y, OPENCODE_W, OPENCODE_H, C_OPENCODE);
+  g.fillRect(x + 24, y + 24, 48, 72, C_BG);
 }
 
 void render() {
@@ -281,7 +269,7 @@ void setup() {
   C_TEXT = M5.Display.color565(235, 235, 240);
   C_DIM = M5.Display.color565(140, 140, 155);
   C_ACCENT = M5.Display.color565(120, 170, 255);
-  C_OPENCODE = M5.Display.color565(207, 206, 205);
+  C_OPENCODE = M5.Display.color565(241, 236, 236);
   C_CLAUDE = M5.Display.color565(217, 119, 87);
   C_CODEX = M5.Display.color565(159, 227, 181);
   C_CURSOR = M5.Display.color565(233, 230, 223);
