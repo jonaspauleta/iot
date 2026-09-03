@@ -1,7 +1,7 @@
 # OpenCode Screensaver and First-Party Provider Marks
 
 Date: 2026-09-03
-Status: Draft for user review
+Status: Approved
 
 ## Summary
 
