@@ -15,6 +15,7 @@ static const uint32_t SAVER_MS = 30000; // idle time before the crab takes over
 
 uint16_t C_BG, C_TRACK, C_GREEN, C_AMBER, C_RED, C_TEXT, C_DIM, C_ACCENT;
 uint16_t C_CRAB;
+uint16_t C_OPENCODE, C_CLAUDE, C_CODEX, C_CURSOR, C_GROK;
 
 M5Canvas canvas(&M5.Display);
 bool useSprite = false;
@@ -62,6 +63,32 @@ void fmtRel(uint32_t r, char* out, size_t n) {
 }
 
 template <typename G>
+void drawProviderMark(G& g, const char* name, int x, int y) {
+  if (strcmp(name, "Claude") == 0) {
+    // Coral C mark.
+    g.fillCircle(x + 6, y + 6, 5, C_CLAUDE);
+    g.fillRect(x + 6, y + 1, 6, 10, C_BG);
+  } else if (strcmp(name, "Codex") == 0) {
+    // Small mint three-spoke OpenAI/Codex-style knot.
+    g.drawLine(x + 6, y + 1, x + 6, y + 11, C_CODEX);
+    g.drawLine(x + 1, y + 3, x + 11, y + 9, C_CODEX);
+    g.drawLine(x + 1, y + 9, x + 11, y + 3, C_CODEX);
+    g.fillCircle(x + 6, y + 6, 2, C_CODEX);
+  } else if (strcmp(name, "Cursor") == 0) {
+    // Light hollow cursor chevron.
+    g.fillTriangle(x + 2, y + 1, x + 2, y + 11, x + 10, y + 7, C_CURSOR);
+    g.fillTriangle(x + 4, y + 4, x + 4, y + 8, x + 8, y + 7, C_BG);
+  } else if (strcmp(name, "Grok") == 0) {
+    // Blue X mark.
+    g.drawLine(x + 2, y + 2, x + 10, y + 10, C_GROK);
+    g.drawLine(x + 10, y + 2, x + 2, y + 10, C_GROK);
+  } else {
+    // Neutral fallback for an unknown future window name.
+    g.fillRoundRect(x + 2, y + 2, 8, 8, 2, C_DIM);
+  }
+}
+
+template <typename G>
 void drawBlock(G& g, int top, int blockH, const Bar& b, bool dim) {
   int cy = top + (blockH - 52) / 2;
   g.setFont(&fonts::FreeSansBold9pt7b);
@@ -105,11 +132,12 @@ void drawUI(G& g) {
 
   const Win& w = win[cur];
 
-  // Header: provider name, degraded tag, heartbeat.
+  // Header: provider mark, provider name, degraded tag, heartbeat.
   g.setFont(&fonts::FreeSansBold12pt7b);
   g.setTextColor(C_TEXT);
   g.setTextDatum(TL_DATUM);
-  g.drawString(w.n, BAR_X, 6);
+  drawProviderMark(g, w.n, BAR_X, 8);
+  g.drawString(w.n, BAR_X + 17, 6);
 
   g.fillCircle(W - 14, 14, 4, beat ? C_GREEN : C_TRACK);
 
@@ -270,6 +298,11 @@ void setup() {
   C_DIM = M5.Display.color565(140, 140, 155);
   C_ACCENT = M5.Display.color565(120, 170, 255);
   C_CRAB = M5.Display.color565(217, 119, 87);   // Claude coral #D97757
+  C_OPENCODE = M5.Display.color565(207, 206, 205);
+  C_CLAUDE = M5.Display.color565(217, 119, 87);
+  C_CODEX = M5.Display.color565(159, 227, 181);
+  C_CURSOR = M5.Display.color565(233, 230, 223);
+  C_GROK = M5.Display.color565(139, 184, 255);
 
   // 8-bit sprite (75KB) fits internal RAM; the 16-bit one (150KB) does not on the
   // PSRAM-less Core. Fall back to direct draw if even this fails.
