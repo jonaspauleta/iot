@@ -50,10 +50,10 @@ async function fetchCursorBot(cookie, request = fetch) {
       method: 'POST',
       headers: { Cookie: cookie, Accept: 'application/json' },
     });
-    if (!res.ok) return { p: -1, r: 0 };
+    if (!res.ok) return parseCursorBot();
     return parseCursorBot(await res.json());
   } catch {
-    return { p: -1, r: 0 };
+    return parseCursorBot();
   }
 }
 
@@ -97,11 +97,7 @@ async function fetchCursor() {
     return {
       n: 'Cursor',
       ok: true,
-      bars: [parsed.bars[0], parsed.bars[1], {
-        l: 'grok bot',
-        p: bot.p,
-        r: bot.r,
-      }],
+      bars: [parsed.bars[0], parsed.bars[1], { ...parsed.bars[2], ...bot }],
     };
   } catch {
     return { n: 'Cursor', ok: false, bars: [], e: 'err' };
